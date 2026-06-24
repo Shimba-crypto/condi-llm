@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Condi Limited — Language Model Infrastructure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,800;1,9..144,300;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --ink: #0c0d0a;
+    --ink-2: #14150f;
+    --ink-3: #1c1d15;
+    --cream: #f4efe2;
+    --cream-dim: #a8a294;
+    --cream-faint: #6b6859;
+    --lime: #d4ff3a;
+    --lime-soft: #a8cc2e;
+    --rust: #ff6b3d;
+    --line: rgba(244, 239, 226, 0.10);
+    --line-strong: rgba(244, 239, 226, 0.22);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(212, 255, 58, 0.06), transparent 60%),
+      radial-gradient(ellipse 800px 500px at 90% 10%, rgba(255, 107, 61, 0.04), transparent 60%),
+      var(--ink);
+  }
+
+  .font-display { font-family: 'Fraunces', serif; font-variation-settings: "opsz" 144; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.95 0 0 0 0 0.94 0 0 0 0 0.89 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  /* Nav */
+  .nav-blur {
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    background: rgba(12, 13, 10, 0.65);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 12px var(--lime);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Hero canvas */
+  #lattice {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  .hero-headline {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144;
+    font-weight: 300;
+    letter-spacing: -0.04em;
+    line-height: 0.92;
+  }
+
+  .hero-headline .accent {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--lime);
+  }
+
+  .hero-headline .accent-rust {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--rust);
+  }
+
+  /* Install pill */
+  .install-pill {
+    background: rgba(244, 239, 226, 0.04);
+    border: 1px solid var(--line-strong);
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .install-pill:hover {
+    background: rgba(244, 239, 226, 0.07);
+    border-color: rgba(212, 255, 58, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .install-pill .copy-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .install-pill:hover .copy-btn {
+    opacity: 1;
+  }
+
+  /* Product card */
+  .product-card {
+    background: linear-gradient(180deg, rgba(244, 239, 226, 0.03) 0%, rgba(244, 239, 226, 0.01) 100%);
+    border: 1px solid var(--line);
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .product-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle 400px at var(--mx, 50%) var(--my, 50%), rgba(212, 255, 58, 0.08), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+
+  .product-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+
+  .product-card:hover::before {
+    opacity: 1;
+  }
+
+  .product-card.llm::before {
+    background: radial-gradient(circle 400px at var(--mx, 50%) var(--my, 50%), rgba(255, 107, 61, 0.08), transparent 70%);
+  }
+
+  .product-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+
+  .product-tag .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+  }
+
+  /* Code window */
+  .code-window {
+    background: #08090a;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .code-window .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(244, 239, 226, 0.02);
+  }
+
+  .code-window .dot-r { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+  .code-window .dot-y { width: 11px; height: 11px; border-radius: 50%; background: #febc2e; }
+  .code-window .dot-g { width: 11px; height: 11px; border-radius: 50%; background: #28c840; }
+
+  .code-window .body {
+    padding: 20px 22px;
+    overflow-x: auto;
+    color: var(--cream);
+  }
+
+  .tok-kw { color: #ff6b3d; }
+  .tok-fn { color: #d4ff3a; }
+  .tok-str { color: #f4efe2; }
+  .tok-com { color: var(--cream-faint); font-style: italic; }
+  .tok-num { color: #c8a06f; }
+  .tok-cls { color: #b8d4ff; }
+  .tok-mod { color: #e6db74; }
+
+  /* Feature row */
+  .feature-row {
+    border-top: 1px solid var(--line);
+    padding: 28px 0;
+    display: grid;
+    grid-template-columns: 80px 1fr 2fr 80px;
+    gap: 32px;
+    align-items: start;
+    transition: padding 0.4s, background 0.4s;
+  }
+
+  .feature-row:last-child {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .feature-row:hover {
+    padding-left: 16px;
+    background: linear-gradient(90deg, rgba(244, 239, 226, 0.02), transparent);
+  }
+
+  .feature-row:hover .feature-arrow {
+    transform: translateX(8px);
+    color: var(--lime);
+  }
+
+  .feature-arrow {
+    transition: all 0.3s;
+    color: var(--cream-faint);
+  }
+
+  /* Stats */
+  .stat-num {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144;
+    font-weight: 300;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: var(--lime);
+    color: var(--ink);
+    border: none;
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--bx, 50%) var(--by, 50%), rgba(255, 255, 255, 0.4), transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 30px -10px rgba(212, 255, 58, 0.5);
+  }
+
+  .btn-primary:hover::after { opacity: 1; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--cream);
+    border: 1px solid var(--line-strong);
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--cream);
+    background: rgba(244, 239, 226, 0.04);
+  }
+
+  /* Section labels */
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+
+  .section-label::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--lime);
+  }
+
+  /* Marquee */
+  .marquee {
+    display: flex;
+    gap: 60px;
+    animation: scroll 40s linear infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* Reveal */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .reveal.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Tabs */
+  .tab-btn {
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: var(--cream-dim);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .tab-btn.active {
+    color: var(--ink);
+    background: var(--lime);
+    border-color: var(--lime);
+  }
+
+  .tab-btn:not(.active):hover {
+    color: var(--cream);
+    border-color: var(--line-strong);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--cream);
+    color: var(--ink);
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 100;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.5);
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* Latency ticker */
+  .latency-ticker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--cream-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Headline responsive */
+  .hero-headline { font-size: clamp(3rem, 9vw, 8.5rem); }
+
+  @media (max-width: 768px) {
+    .feature-row {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .feature-row .feature-num,
+    .feature-row .feature-arrow { display: none; }
+  }
+
+  /* Selection */
+  ::selection { background: var(--lime); color: var(--ink); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--ink); }
+  ::-webkit-scrollbar-thumb { background: rgba(244, 239, 226, 0.15); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(244, 239, 226, 0.25); }
+
+  /* Diagram nodes */
+  .arch-node {
+    border: 1px solid var(--line-strong);
+    background: rgba(244, 239, 226, 0.02);
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .arch-node:hover {
+    border-color: var(--lime);
+    background: rgba(212, 255, 58, 0.04);
+  }
+
+  .arch-node .pulse {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 10px var(--lime);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Reduce motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast">Copied to clipboard</div>
+
+<!-- Navigation -->
+<nav class="nav-blur fixed top-0 left-0 right-0 z-50">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2.5 group">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M3 12 L9 6 L9 18 L15 6 L15 18 L21 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--lime)"/>
+      </svg>
+      <span class="font-display text-lg tracking-tight">Condi<span style="color: var(--cream-dim)">.ltd</span></span>
+    </a>
+
+    <div class="hidden md:flex items-center gap-8 text-sm" style="color: var(--cream-dim)">
+      <a href="#products" class="hover:text-white transition-colors">Products</a>
+      <a href="#code" class="hover:text-white transition-colors">Code</a>
+      <a href="#features" class="hover:text-white transition-colors">Features</a>
+      <a href="#docs" class="hover:text-white transition-colors">Docs</a>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <div class="hidden md:flex latency-ticker">
+        <span class="live-dot"></span>
+        <span>p50 <span id="latency" style="color: var(--cream)">12.4ms</span></span>
+      </div>
+      <button class="btn-primary text-xs px-5 py-2.5" onclick="scrollToProducts()">Get Started</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="relative min-h-screen flex items-center pt-16 overflow-hidden">
+  <canvas id="lattice"></canvas>
+
+  <div class="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 w-full">
+    <div class="reveal" style="transition-delay: 0.1s">
+      <div class="section-label mb-8">Condi Limited / EST. 2023 / Lagos · London</div>
+    </div>
+
+    <h1 class="hero-headline reveal mb-10" style="transition-delay: 0.2s">
+      Language models,<br>
+      <span class="accent">distilled</span> to their<br>
+      <span class="accent-rust">essence.</span>
+    </h1>
+
+    <div class="grid lg:grid-cols-12 gap-8 items-end">
+      <div class="lg:col-span-6 reveal" style="transition-delay: 0.35s">
+        <p class="text-lg leading-relaxed" style="color: var(--cream-dim); max-width: 520px;">
+          Condi Limited builds the Python infrastructure for shipping language models — from
+          millisecond-latency small models on the edge to trillion-parameter reasoning engines
+          in the cloud. Two libraries, one philosophy: <span style="color: var(--cream)">make inference boring.</span>
+        </p>
+
+        <div class="flex flex-wrap gap-3 mt-8">
+          <div class="install-pill rounded-full px-5 py-3 flex items-center gap-3 cursor-pointer font-mono text-sm" onclick="copyText('pip install condi-slm', this)">
+            <span style="color: var(--cream-faint)">$</span>
+            <span>pip install condi-slm</span>
+            <span class="copy-btn" style="color: var(--lime)">copy</span>
+          </div>
+          <div class="install-pill rounded-full px-5 py-3 flex items-center gap-3 cursor-pointer font-mono text-sm" onclick="copyText('pip install condi-llm', this)">
+            <span style="color: var(--cream-faint)">$</span>
+            <span>pip install condi-llm</span>
+            <span class="copy-btn" style="color: var(--lime)">copy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-6 reveal" style="transition-delay: 0.5s">
+        <div class="grid grid-cols-3 gap-4 lg:gap-8 lg:pl-12">
+          <div>
+            <div class="stat-num text-4xl lg:text-5xl" style="color: var(--cream)">2.1M</div>
+            <div class="text-xs mt-2 font-mono uppercase tracking-wider" style="color: var(--cream-faint)">Weekly downloads</div>
+          </div>
+          <div>
+            <div class="stat-num text-4xl lg:text-5xl" style="color: var(--lime)">11<span class="text-2xl">ms</span></div>
+            <div class="text-xs mt-2 font-mono uppercase tracking-wider" style="color: var(--cream-faint)">p99 SLM latency</div>
+          </div>
+          <div>
+            <div class="stat-num text-4xl lg:text-5xl" style="color: var(--cream)">99.98<span class="text-2xl">%</span></div>
+            <div class="text-xs mt-2 font-mono uppercase tracking-wider" style="color: var(--cream-faint)">Uptime, 90 days</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal mt-20 flex items-center gap-3 text-xs font-mono uppercase tracking-widest" style="color: var(--cream-faint); transition-delay: 0.7s">
+      <span>Scroll to explore</span>
+      <div class="w-12 h-px" style="background: var(--line-strong)"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Marquee -->
+<section class="py-8 border-y" style="border-color: var(--line)">
+  <div class="overflow-hidden">
+    <div class="marquee font-display text-3xl md:text-4xl" style="font-weight: 300; color: var(--cream-dim)">
+      <span>condi-slm</span>
+      <span style="color: var(--lime)">•</span>
+      <span style="font-style: italic">edge inference</span>
+      <span style="color: var(--lime)">•</span>
+      <span>condi-llm</span>
+      <span style="color: var(--rust)">•</span>
+      <span style="font-style: italic">reasoning at scale</span>
+      <span style="color: var(--rust)">•</span>
+      <span>Apache 2.0</span>
+      <span style="color: var(--lime)">•</span>
+      <span style="font-style: italic">PyTorch native</span>
+      <span style="color: var(--lime)">•</span>
+      <span>condi-slm</span>
+      <span style="color: var(--lime)">•</span>
+      <span style="font-style: italic">edge inference</span>
+      <span style="color: var(--lime)">•</span>
+      <span>condi-llm</span>
+      <span style="color: var(--rust)">•</span>
+      <span style="font-style: italic">reasoning at scale</span>
+      <span style="color: var(--rust)">•</span>
+      <span>Apache 2.0</span>
+      <span style="color: var(--lime)">•</span>
+      <span style="font-style: italic">PyTorch native</span>
+      <span style="color: var(--lime)">•</span>
+    </div>
+  </div>
+</section>
+
+<!-- Products -->
+<section id="products" class="py-24 lg:py-36 relative">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-8 mb-16">
+      <div class="lg:col-span-5 reveal">
+        <div class="section-label mb-6">02 / Products</div>
+        <h2 class="font-display text-5xl lg:text-6xl" style="font-weight: 300; letter-spacing: -0.03em; line-height: 1;">
+          Two libraries.<br>
+          <span style="font-style: italic; color: var(--cream-dim)">One ecosystem.</span>
+        </h2>
+      </div>
+      <div class="lg:col-span-6 lg:col-start-7 reveal flex items-end" style="transition-delay: 0.2s">
+        <p class="text-base leading-relaxed" style="color: var(--cream-dim)">
+          The same team behind Condi's inference stack ships two open-source libraries.
+          They share a common tokenizer, checkpoint format, and tracing API — so you can
+          train with <span class="font-mono text-sm" style="color: var(--cream)">condi-llm</span>
+          and distill directly into <span class="font-mono text-sm" style="color: var(--cream)">condi-slm</span>
+          without rewriting a line.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- condi-slm -->
+      <div class="product-card rounded-2xl p-8 lg:p-10 reveal" style="transition-delay: 0.1s" onmousemove="cardMove(event, this)">
+        <div class="flex items-start justify-between mb-8">
+          <div>
+            <div class="product-tag mb-4">
+              <span class="dot" style="background: var(--lime)"></span>
+              Lightweight / Edge
+            </div>
+            <h3 class="font-display text-4xl" style="font-weight: 500; letter-spacing: -0.02em;">condi-slm</h3>
+            <p class="text-sm font-mono mt-1" style="color: var(--cream-faint)">v2.4.1 · 18 MB wheel</p>
+          </div>
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <rect x="4" y="4" width="20" height="20" rx="3" stroke="var(--lime)" stroke-width="1.5"/>
+            <rect x="32" y="4" width="20" height="20" rx="3" stroke="var(--lime)" stroke-width="1.5" opacity="0.4"/>
+            <rect x="4" y="32" width="20" height="20" rx="3" stroke="var(--lime)" stroke-width="1.5" opacity="0.4"/>
+            <rect x="32" y="32" width="20" height="20" rx="3" stroke="var(--lime)" stroke-width="1.5"/>
+            <line x1="24" y1="14" x2="32" y2="14" stroke="var(--lime)" stroke-width="1.5"/>
+            <line x1="14" y1="24" x2="14" y2="32" stroke="var(--lime)" stroke-width="1.5"/>
+            <line x1="24" y1="42" x2="32" y2="42" stroke="var(--lime)" stroke-width="1.5"/>
+            <line x1="42" y1="24" x2="42" y2="32" stroke="var(--lime)" stroke-width="1.5"/>
+          </svg>
+        </div>
+
+        <p class="text-base leading-relaxed mb-8" style="color: var(--cream-dim)">
+          A small-language-model runtime engineered for sub-15ms first-token latency on
+          commodity CPUs. Quantized weights, ONNX export, and a 6MB Python wheel that
+          installs in under three seconds.
+        </p>
+
+        <div class="code-window mb-8">
+          <div class="header">
+            <div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div>
+            <span class="ml-2 text-xs" style="color: var(--cream-faint)">quickstart.py</span>
+          </div>
+          <div class="body">
+<span class="tok-kw">from</span> <span class="tok-mod">condi_slm</span> <span class="tok-kw">import</span> <span class="tok-cls">SLM</span>
+
+model = <span class="tok-cls">SLM</span>.<span class="tok-fn">load</span>(<span class="tok-str">"condi-mini-1.2b"</span>)
+reply = model.<span class="tok-fn">generate</span>(
+    <span class="tok-str">"Summarize the quarterly report"</span>,
+    max_tokens=<span class="tok-num">128</span>,
+    temperature=<span class="tok-num">0.3</span>
+)
+<span class="tok-com"># first token in 9.2ms on M2</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-8">
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500; color: var(--lime)">9.2ms</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">First token</div>
+          </div>
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500">6MB</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">Wheel size</div>
+          </div>
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500">1.2B</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">Params</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-6 border-t" style="border-color: var(--line)">
+          <a href="#" class="text-sm font-medium flex items-center gap-2 group" style="color: var(--cream)">
+            View documentation
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="transition-transform group-hover:translate-x-1">
+              <path d="M1 7H13M13 7L7.5 1.5M13 7L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <div class="install-pill rounded-full px-4 py-2 flex items-center gap-2 cursor-pointer font-mono text-xs" onclick="copyText('pip install condi-slm', this)">
+            <span style="color: var(--cream-faint)">$</span>
+            <span>pip install condi-slm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- condi-llm -->
+      <div class="product-card llm rounded-2xl p-8 lg:p-10 reveal" style="transition-delay: 0.2s" onmousemove="cardMove(event, this)">
+        <div class="flex items-start justify-between mb-8">
+          <div>
+            <div class="product-tag mb-4">
+              <span class="dot" style="background: var(--rust)"></span>
+              Heavyweight / Cloud
+            </div>
+            <h3 class="font-display text-4xl" style="font-weight: 500; letter-spacing: -0.02em;">condi-llm</h3>
+            <p class="text-sm font-mono mt-1" style="color: var(--cream-faint)">v0.9.0 · distributed training</p>
+          </div>
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <circle cx="14" cy="14" r="6" stroke="var(--rust)" stroke-width="1.5"/>
+            <circle cx="42" cy="14" r="6" stroke="var(--rust)" stroke-width="1.5" opacity="0.5"/>
+            <circle cx="14" cy="42" r="6" stroke="var(--rust)" stroke-width="1.5" opacity="0.5"/>
+            <circle cx="42" cy="42" r="6" stroke="var(--rust)" stroke-width="1.5"/>
+            <circle cx="28" cy="28" r="8" stroke="var(--rust)" stroke-width="1.5"/>
+            <line x1="20" y1="14" x2="36" y2="14" stroke="var(--rust)" stroke-width="1.5" opacity="0.4"/>
+            <line x1="14" y1="20" x2="14" y2="36" stroke="var(--rust)" stroke-width="1.5" opacity="0.4"/>
+            <line x1="42" y1="20" x2="42" y2="36" stroke="var(--rust)" stroke-width="1.5" opacity="0.4"/>
+            <line x1="20" y1="42" x2="36" y2="42" stroke="var(--rust)" stroke-width="1.5" opacity="0.4"/>
+          </svg>
+        </div>
+
+        <p class="text-base leading-relaxed mb-8" style="color: var(--cream-dim)">
+          A distributed training and serving framework for models up to 405B parameters.
+          Built-in FSDP, pipeline parallelism, speculative decoding, and an RLHF loop that
+          runs on eight GPUs instead of eighty.
+        </p>
+
+        <div class="code-window mb-8">
+          <div class="header">
+            <div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div>
+            <span class="ml-2 text-xs" style="color: var(--cream-faint)">train.py</span>
+          </div>
+          <div class="body">
+<span class="tok-kw">import</span> <span class="tok-mod">condi_llm</span> <span class="tok-kw">as</span> cllm
+
+model = cllm.<span class="tok-cls">AutoModel</span>.<span class="tok-fn">from_pretrained</span>(<span class="tok-str">"condi-70b"</span>)
+trainer = cllm.<span class="tok-fn">Trainer</span>(
+    model,
+    strategy=<span class="tok-str">"fsdp_shard"</span>,
+    grad_accum=<span class="tok-num">32</span>,
+)
+trainer.<span class="tok-fn">fit</span>(dataset, epochs=<span class="tok-num">3</span>)
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-8">
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500; color: var(--rust)">405B</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">Max params</div>
+          </div>
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500">8×</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">GPU efficient</div>
+          </div>
+          <div>
+            <div class="font-display text-2xl" style="font-weight: 500">92%</div>
+            <div class="text-xs font-mono mt-1" style="color: var(--cream-faint)">MFU sustained</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-6 border-t" style="border-color: var(--line)">
+          <a href="#" class="text-sm font-medium flex items-center gap-2 group" style="color: var(--cream)">
+            View documentation
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="transition-transform group-hover:translate-x-1">
+              <path d="M1 7H13M13 7L7.5 1.5M13 7L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <div class="install-pill rounded-full px-4 py-2 flex items-center gap-2 cursor-pointer font-mono text-xs" onclick="copyText('pip install condi-llm', this)">
+            <span style="color: var(--cream-faint)">$</span>
+            <span>pip install condi-llm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Code Example Section -->
+<section id="code" class="py-24 lg:py-32 relative" style="background: linear-gradient(180deg, transparent, rgba(244, 239, 226, 0.015), transparent)">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-12 items-start">
+      <div class="lg:col-span-5 lg:sticky lg:top-24 reveal">
+        <div class="section-label mb-6">03 / Workflow</div>
+        <h2 class="font-display text-5xl lg:text-6xl mb-6" style="font-weight: 300; letter-spacing: -0.03em; line-height: 1;">
+          From a thousand<br>
+          <span style="font-style: italic; color: var(--lime)"> GPUs </span>
+          to a single<br>laptop.
+        </h2>
+        <p class="text-base leading-relaxed mb-8" style="color: var(--cream-dim)">
+          The same model can be trained at scale with <span class="font-mono text-sm" style="color: var(--cream)">condi-llm</span>,
+          quantized with a single function call, then deployed with <span class="font-mono text-sm" style="color: var(--cream)">condi-slm</span>
+          on a Raspberry Pi. Same weights, same tokenizer, same API surface.
+        </p>
+
+        <div class="space-y-3">
+          <div class="arch-node flex items-center justify-between">
+            <div>
+              <div style="color: var(--cream)">Train</div>
+              <div class="text-xs mt-1" style="color: var(--cream-faint)">condi-llm · 8×H100 · 14 days</div>
+            </div>
+            <span class="pulse"></span>
+          </div>
+          <div class="text-center font-mono text-xs" style="color: var(--cream-faint)">↓ distill()</div>
+          <div class="arch-node flex items-center justify-between">
+            <div>
+              <div style="color: var(--cream)">Compress</div>
+              <div class="text-xs mt-1" style="color: var(--cream-faint)">1.2B params · int4 quantized</div>
+            </div>
+            <span class="pulse" style="animation-delay: 0.6s"></span>
+          </div>
+          <div class="text-center font-mono text-xs" style="color: var(--cream-faint)">↓ export()</div>
+          <div class="arch-node flex items-center justify-between">
+            <div>
+              <div style="color: var(--cream)">Serve</div>
+              <div class="text-xs mt-1" style="color: var(--cream-faint)">condi-slm · edge · 11ms</div>
+            </div>
+            <span class="pulse" style="animation-delay: 1.2s"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 reveal" style="transition-delay: 0.2s">
+        <div class="flex gap-2 mb-5">
+          <button class="tab-btn active" data-tab="distill">distill.py</button>
+          <button class="tab-btn" data-tab="serve">serve.py</button>
+          <button class="tab-btn" data-tab="trace">trace.py</button>
+        </div>
+
+        <div class="code-window" id="codeBlock">
+          <div class="header">
+            <div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div>
+            <span class="ml-2 text-xs" style="color: var(--cream-faint)" id="codeFile">distill.py</span>
+          </div>
+          <div class="body" id="codeBody">
+<span class="tok-com"># Train a 70B model, distill into a 1.2B student.</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_llm</span> <span class="tok-kw">import</span> <span class="tok-cls">Trainer</span>, <span class="tok-cls">Distiller</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_slm</span> <span class="tok-kw">import</span> <span class="tok-cls">SLM</span>
+
+teacher = <span class="tok-cls">Trainer</span>.<span class="tok-fn">load</span>(<span class="tok-str">"condi-70b"</span>)
+student  = <span class="tok-cls">SLM</span>.<span class="tok-fn">empty</span>(params=<span class="tok-str">"1.2b"</span>)
+
+distiller = <span class="tok-cls">Distiller</span>(
+    teacher=teacher,
+    student=student,
+    temperature=<span class="tok-num">2.0</span>,
+    loss=<span class="tok-str">"forward_kl"</span>,
+)
+
+distiller.<span class="tok-fn">fit</span>(dataset, epochs=<span class="tok-num">4</span>)
+student.<span class="tok-fn">save</span>(<span class="tok-str">"condi-mini-1.2b"</span>)
+          </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between text-xs font-mono" style="color: var(--cream-faint)">
+          <span>Python 3.9+ · PyTorch 2.2+ · Apache 2.0</span>
+          <button class="hover:text-white transition-colors flex items-center gap-2" onclick="copyCode()">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M2 8V2H8" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            Copy snippet
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features" class="py-24 lg:py-36">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-8 mb-20">
+      <div class="lg:col-span-5 reveal">
+        <div class="section-label mb-6">04 / Capabilities</div>
+        <h2 class="font-display text-5xl lg:text-6xl" style="font-weight: 300; letter-spacing: -0.03em; line-height: 1;">
+          What you get<br>
+          <span style="font-style: italic; color: var(--cream-dim)">out of the box.</span>
+        </h2>
+      </div>
+    </div>
+
+    <div class="reveal">
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/01</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">Unified tokenizer</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          Both libraries ship with the condi-tokenizer — a 128k-vocabulary BPE that handles
+          47 languages, code, and structured outputs without re-encoding. Same vocab from
+          1.2B to 405B.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/02</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">Speculative decoding</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          A small draft model proposes tokens that the verifier accepts in a single forward
+          pass. Up to 3.4× throughput on chat workloads, with no quality regression.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/03</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">ONNX &amp; CoreML export</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          One call to <span class="font-mono" style="color: var(--cream)">model.export()</span> ships
+          your SLM to iOS, browser WASM, or any ONNX runtime. No PyTorch dependency at inference time.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/04</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">Distributed tracing</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          OpenTelemetry-native. Every forward pass, KV-cache hit, and quantization error
+          is a span. Pipe directly into Honeycomb, Tempo, or your local Jaeger.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/05</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">RLHF &amp; DPO loops</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          Built-in preference datasets, reward modeling, and direct preference optimization.
+          Run a full alignment pass on a 70B model in 22 hours using eight H100s.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-num font-mono text-sm" style="color: var(--cream-faint)">/06</div>
+        <div>
+          <h3 class="font-display text-2xl" style="font-weight: 500;">Zero-config KV cache</h3>
+        </div>
+        <div class="text-sm leading-relaxed" style="color: var(--cream-dim)">
+          Paged attention, prefix caching, and disk-backed offload — all on by default.
+          14× longer context windows on the same hardware, with no code changes.
+        </div>
+        <div class="feature-arrow text-right text-2xl">→</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-24 lg:py-36 relative overflow-hidden">
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse 800px 400px at 50% 50%, rgba(212, 255, 58, 0.08), transparent 60%)"></div>
+  <div class="max-w-5xl mx-auto px-6 lg:px-10 relative">
+    <div class="text-center reveal">
+      <div class="section-label justify-center mb-8" style="display: inline-flex">05 / Get started</div>
+      <h2 class="font-display text-5xl lg:text-7xl mb-8" style="font-weight: 300; letter-spacing: -0.04em; line-height: 1;">
+        Stop wiring<br>
+        <span style="font-style: italic; color: var(--lime)">infrastructure.</span><br>
+        Start shipping models.
+      </h2>
+      <p class="text-lg mb-12 max-w-2xl mx-auto" style="color: var(--cream-dim)">
+        Install either library in under a minute. No account, no API key, no telemetry.
+        Apache 2.0 licensed, forever.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <div class="install-pill rounded-full px-6 py-4 flex items-center gap-3 cursor-pointer font-mono text-sm" onclick="copyText('pip install condi-slm condi-llm', this)">
+          <span style="color: var(--cream-faint)">$</span>
+          <span>pip install condi-slm condi-llm</span>
+          <span class="copy-btn" style="color: var(--lime)">copy</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-4 mt-10">
+        <a href="#" class="btn-primary inline-flex items-center gap-2">
+          Read the docs
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 7H13M13 7L7.5 1.5M13 7L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </a>
+        <a href="#" class="btn-ghost">Star on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t pt-16 pb-10" style="border-color: var(--line)">
+  <div class="max-w-7xl mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 mb-16">
+      <div class="lg:col-span-4">
+        <a href="#" class="flex items-center gap-2.5 mb-5">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M3 12 L9 6 L9 18 L15 6 L15 18 L21 12" stroke="var(--lime)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="font-display text-lg">Condi<span style="color: var(--cream-dim)">.ltd</span></span>
+        </a>
+        <p class="text-sm leading-relaxed mb-6" style="color: var(--cream-dim); max-width: 320px;">
+          Condi Limited is a private AI infrastructure company headquartered in Lagos
+          with an engineering office in London.
+        </p>
+        <div class="flex items-center gap-2 text-xs font-mono" style="color: var(--cream-faint)">
+          <span class="live-dot"></span>
+          <span>All systems operational</span>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="text-xs font-mono uppercase tracking-widest mb-4" style="color: var(--cream-faint)">Products</div>
+        <ul class="space-y-3 text-sm" style="color: var(--cream-dim)">
+          <li><a href="#" class="hover:text-white transition-colors">condi-slm</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">condi-llm</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">condi-tokenizer</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">condi-cloud</a></li>
+        </ul>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="text-xs font-mono uppercase tracking-widest mb-4" style="color: var(--cream-faint)">Resources</div>
+        <ul class="space-y-3 text-sm" style="color: var(--cream-dim)">
+          <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Model hub</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Cookbook</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Changelog</a></li>
+        </ul>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="text-xs font-mono uppercase tracking-widest mb-4" style="color: var(--cream-faint)">Company</div>
+        <ul class="space-y-3 text-sm" style="color: var(--cream-dim)">
+          <li><a href="#" class="hover:text-white transition-colors">About</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Careers</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Research</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="text-xs font-mono uppercase tracking-widest mb-4" style="color: var(--cream-faint)">Connect</div>
+        <ul class="space-y-3 text-sm" style="color: var(--cream-dim)">
+          <li><a href="#" class="hover:text-white transition-colors">GitHub</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Discord</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">X / Twitter</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">arXiv</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-8 border-t font-mono text-xs" style="border-color: var(--line); color: var(--cream-faint)">
+      <div>© 2024 Condi Limited · Registered in England &amp; Wales · 14982...</div>
+      <div class="flex gap-6">
+        <a href="#" class="hover:text-white transition-colors">Privacy</a>
+        <a href="#" class="hover:text-white transition-colors">Terms</a>
+        <a href="#" class="hover:text-white transition-colors">Security</a>
+        <a href="#" class="hover:text-white transition-colors">Status</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ============ Neural Lattice Canvas ============
+  const canvas = document.getElementById('lattice');
+  const ctx = canvas.getContext('2d');
+  let nodes = [];
+  let mouse = { x: -9999, y: -9999, active: false };
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    initNodes(rect.width, rect.height);
+  }
+
+  function initNodes(w, h) {
+    nodes = [];
+    const spacing = w < 768 ? 70 : 55;
+    const cols = Math.ceil(w / spacing) + 1;
+    const rows = Math.ceil(h / spacing) + 1;
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = i * spacing + (Math.random() - 0.5) * 16;
+        const y = j * spacing + (Math.random() - 0.5) * 16;
+        nodes.push({
+          x, y, ox: x, oy: y,
+          phase: Math.random() * Math.PI * 2,
+          freq: 0.3 + Math.random() * 0.4,
+          size: 0.6 + Math.random() * 1.4,
+          activation: 0
+        });
+      }
+    }
+  }
+
+  let t = 0;
+  function drawLattice() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    t += 0.008;
+
+    // Update node positions with gentle drift
+    for (const n of nodes) {
+      n.x = n.ox + Math.sin(t * n.freq + n.phase) * 8;
+      n.y = n.oy + Math.cos(t * n.freq * 0.8 + n.phase) * 8;
+
+      // Mouse interaction
+      if (mouse.active) {
+        const dx = n.x - mouse.x;
+        const dy = n.y - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 180) {
+          const force = (1 - dist / 180);
+          n.activation = Math.max(n.activation, force);
+          n.x += (dx / Math.max(dist, 1)) * force * 8;
+          n.y += (dy / Math.max(dist, 1)) * force * 8;
+        }
+      }
+      n.activation *= 0.95;
+    }
+
+    // Draw connections
+    const maxDist = 75;
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < maxDist) {
+          const alpha = (1 - dist / maxDist) * 0.18;
+          const activation = Math.max(a.activation, b.activation);
+          if (activation > 0.1) {
+            ctx.strokeStyle = `rgba(212, 255, 58, ${alpha + activation * 0.4})`;
+            ctx.lineWidth = 0.6 + activation * 1.2;
+          } else {
+            ctx.strokeStyle = `rgba(244, 239, 226, ${alpha})`;
+            ctx.lineWidth = 0.5;
+          }
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw nodes
+    for (const n of nodes) {
+      const r = n.size + n.activation * 2;
+      if (n.activation > 0.2) {
+        ctx.fillStyle = `rgba(212, 255, 58, ${0.6 + n.activation * 0.4})`;
+        ctx.shadowColor = 'rgba(212, 255, 58, 0.8)';
+        ctx.shadowBlur = 12 * n.activation;
+      } else {
+        ctx.fillStyle = `rgba(244, 239, 226, 0.35)`;
+        ctx.shadowBlur = 0;
+      }
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, Math.max(0.3, r), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    requestAnimationFrame(drawLattice);
+  }
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+    mouse.active = true;
+  });
+  canvas.addEventListener('mouseleave', () => { mouse.active = false; });
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  drawLattice();
+
+  // ============ Copy to clipboard ============
+  function copyText(text, el) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(`Copied: ${text}`);
+      if (el) {
+        const btn = el.querySelector('.copy-btn');
+        if (btn) {
+          const orig = btn.textContent;
+          btn.textContent = 'copied';
+          setTimeout(() => btn.textContent = orig, 1400);
+        }
+      }
+    });
+  }
+
+  function copyCode() {
+    const body = document.getElementById('codeBody');
+    const text = body.innerText;
+    navigator.clipboard.writeText(text).then(() => showToast('Code snippet copied'));
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ============ Card mouse tracking ============
+  function cardMove(e, el) {
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+    el.style.setProperty('--my', `${e.clientY - rect.top}px`);
+  }
+
+  // ============ Button shine ============
+  document.querySelectorAll('.btn-primary').forEach(btn => {
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      btn.style.setProperty('--bx', `${e.clientX - rect.left}px`);
+      btn.style.setProperty('--by', `${e.clientY - rect.top}px`);
+    });
+  });
+
+  // ============ Scroll reveal ============
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // ============ Latency ticker ============
+  const latencyEl = document.getElementById('latency');
+  let baseLatency = 12.4;
+  setInterval(() => {
+    const variation = (Math.random() - 0.5) * 2;
+    const v = Math.max(8, baseLatency + variation);
+    latencyEl.textContent = v.toFixed(1) + 'ms';
+  }, 1400);
+
+  // ============ Smooth scroll ============
+  function scrollToProducts() {
+    document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ============ Code tabs ============
+  const snippets = {
+    distill: {
+      file: 'distill.py',
+      code: `<span class="tok-com"># Train a 70B model, distill into a 1.2B student.</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_llm</span> <span class="tok-kw">import</span> <span class="tok-cls">Trainer</span>, <span class="tok-cls">Distiller</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_slm</span> <span class="tok-kw">import</span> <span class="tok-cls">SLM</span>
+
+teacher = <span class="tok-cls">Trainer</span>.<span class="tok-fn">load</span>(<span class="tok-str">"condi-70b"</span>)
+student  = <span class="tok-cls">SLM</span>.<span class="tok-fn">empty</span>(params=<span class="tok-str">"1.2b"</span>)
+
+distiller = <span class="tok-cls">Distiller</span>(
+    teacher=teacher,
+    student=student,
+    temperature=<span class="tok-num">2.0</span>,
+    loss=<span class="tok-str">"forward_kl"</span>,
+)
+
+distiller.<span class="tok-fn">fit</span>(dataset, epochs=<span class="tok-num">4</span>)
+student.<span class="tok-fn">save</span>(<span class="tok-str">"condi-mini-1.2b"</span>)`
+    },
+    serve: {
+      file: 'serve.py',
+      code: `<span class="tok-com"># Serve the distilled model from a $35 board.</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_slm</span> <span class="tok-kw">import</span> <span class="tok-cls">SLM</span>, <span class="tok-cls">Server</span>
+
+model = <span class="tok-cls">SLM</span>.<span class="tok-fn">load</span>(
+    <span class="tok-str">"condi-mini-1.2b"</span>,
+    quantization=<span class="tok-str">"int4"</span>,
+    device=<span class="tok-str">"cpu"</span>,
+    kv_cache=<span class="tok-str">"paged"</span>,
+)
+
+server = <span class="tok-cls">Server</span>(model, port=<span class="tok-num">8000</span>)
+server.<span class="tok-fn">start</span>()
+<span class="tok-com"># &gt; Listening on :8000  ·  11.2ms p50  ·  18.6ms p99</span>`
+    },
+    trace: {
+      file: 'trace.py',
+      code: `<span class="tok-com"># Every forward pass becomes an OpenTelemetry span.</span>
+<span class="tok-kw">from</span> <span class="tok-mod">condi_llm</span> <span class="tok-kw">import</span> trace
+<span class="tok-kw">from</span> <span class="tok-mod">condi_slm</span> <span class="tok-kw">import</span> <span class="tok-cls">SLM</span>
+
+trace.<span class="tok-fn">configure</span>(endpoint=<span class="tok-str">"http://localhost:4317"</span>)
+
+model = <span class="tok-cls">SLM</span>.<span class="tok-fn">load</span>(<span class="tok-str">"condi-mini-1.2b"</span>)
+
+<span class="tok-kw">with</span> trace.<span class="tok-fn">span</span>(<span class="tok-str">"inference.batch"</span>) <span class="tok-kw">as</span> span:
+    span.<span class="tok-fn">set_attr</span>(<span class="tok-str">"batch_size"</span>, <span class="tok-num">32</span>)
+    outputs = model.<span class="tok-fn">batch_generate</span>(prompts)
+    span.<span class="tok-fn">set_attr</span>(<span class="tok-str">"tokens"</span>, <span class="tok-fn">len</span>(outputs))`
+    }
+  };
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const key = btn.dataset.tab;
+      const snip = snippets[key];
+      document.getElementById('codeFile').textContent = snip.file;
+      document.getElementById('codeBody').innerHTML = snip.code;
+    });
+  });
+
+  // ============ Nav links smooth scroll ============
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      if (href.length > 1) {
+        const target = document.querySelector(href);
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
