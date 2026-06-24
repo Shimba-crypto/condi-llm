@@ -7,7 +7,7 @@ from typing import Literal
 
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F  # <-- Fixed import here
 
 @dataclass
 class QuantizationConfig:
@@ -58,8 +58,6 @@ class _QuantizedLinear(nn.Module):
 
 def quantize(model: nn.Module, config: QuantizationConfig | None = None) -> nn.Module:
     """Replace every nn.Linear with a quantized equivalent. Returns a new model in-place."""
-    import torch.nn.functional as F  # local import avoids circular issues
-
     cfg = config or QuantizationConfig()
     for name, module in model.named_children():
         if isinstance(module, nn.Linear):
