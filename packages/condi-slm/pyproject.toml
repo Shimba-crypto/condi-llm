@@ -9,7 +9,7 @@ description = "Edge-first small language model runtime. Sub-15ms first-token lat
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
-authors = [{ name = "Condi Limited", email = "hello@condi.ltd" }]
+authors = [{ name = "Condi Limited", email = "hjsackmba@gmail.com" }]
 keywords = ["llm", "slm", "inference", "edge", "pytorch", "quantization"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
