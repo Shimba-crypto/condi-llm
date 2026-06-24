@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "condi-slm"
-version = "2.4.1"
+version = "2.4.2"
 description = "Edge-first small language model runtime. Sub-15ms first-token latency on commodity CPUs."
 readme = "README.md"
 license = "Apache-2.0"
